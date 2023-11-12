@@ -21,7 +21,7 @@ Decompress gzipped *.kmy file first and then run the script:
 Detailed help:
 
     python3 kmymoney_utils.py [-enh] [-s <count>] [-r <flag>] [-o <outputfile>] <inputfile>.xml
-
+    
     Input arguments:
         -o --output                          Output file, if not specified, output file is set to
                                              "<input file>_fixed.xml". Input file should always be a KMyMoney XML file.
@@ -40,6 +40,8 @@ Detailed help:
                                              even for opening balances the money is transferred from an equity account,
                                              which means the 2nd split must exist and contain equity account information.
         -r --reconcile-flag  <flag>          Assign reconcile <flag> to all splits in all transactions.
-                                             <flag> can be equal to -1 (unknown) 0 (not reconciled), 1 (cleared),
+                                             <flag> can be equal to -1 (unknown), 0 (not reconciled), 1 (cleared),
                                              2 (reconciled) or 3 (frozen).
+        -c --set-expenses-currency <curr>    Set all expense accounts' currency to <curr>.
         -h --help                            Print this help message.
+

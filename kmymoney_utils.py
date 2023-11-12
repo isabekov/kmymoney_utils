@@ -9,6 +9,7 @@
 
 import xml.etree.ElementTree as ET
 import sys
+import re
 import getopt
 
 # Account types are defined in:
@@ -133,14 +134,19 @@ def find_mismatches_in_slits(transactions, accounts, payees, split_type):
     return
 
 
-def fix_reconcile_flag_or_erase_number(transactions, reconcile_flag, to_erase_number):
+def erase_number(transactions, to_erase_number):
     for i, item in enumerate(transactions):
         splits = item.findall("./SPLITS/SPLIT")
         for spl in splits:
-            if to_erase_number:
-                spl.attrib["number"] = ""
-            if reconcile_flag:
-                spl.attrib["reconcileflag"] = reconcile_flag
+            spl.attrib["number"] = ""
+    return
+
+
+def fix_reconcile_flag(transactions, reconcile_flag):
+    for i, item in enumerate(transactions):
+        splits = item.findall("./SPLITS/SPLIT")
+        for spl in splits:
+            spl.attrib["reconcileflag"] = reconcile_flag
     return
 
 
@@ -179,6 +185,7 @@ def print_help():
     -r --reconcile-flag  <flag>          Assign reconcile <flag> to all splits in all transactions.\n\
                                          <flag> can be equal to -1 (unknown), 0 (not reconciled), 1 (cleared),\n\
                                          2 (reconciled) or 3 (frozen).\n\
+    -c --set-expenses-currency <curr>    Set all expense accounts\' currency to <curr>. \n\
     -h --help                            Print this help message.\
     '
     )
@@ -189,7 +196,7 @@ def main(argv):
     try:
         opts, args = getopt.getopt(
             argv[1:],
-            "her:o:ns:",
+            "hec:r:o:ns:",
             [
                 "help",
                 "fix-splits-with-count=",
@@ -197,12 +204,14 @@ def main(argv):
                 "reconcile-flag=",
                 "assign-txn-numbers",
                 "output=",
+                "set-expenses-currency="
             ],
         )
     except getopt.GetoptError:
         print_help()
         sys.exit(2)
 
+    reconcile_flag = None
     to_erase_number = False
     for opt, arg in opts:
         if opt in ("-h", "--help"):
@@ -218,6 +227,9 @@ def main(argv):
             reconcile_flag = arg
         elif opt in ("-n", "--assign-txn-numbers"):
             set_txn_numbers_flag = True
+        elif opt in ("-c", "--set-expenses-currency"):
+            set_expenses_currency_flag = True
+            expenses_currency = arg
 
     if len(args) == 1:
         inputfile = args[0]
@@ -247,12 +259,22 @@ def main(argv):
     if "split_type" in vars():
         find_mismatches_in_slits(transactions, accounts, payees, split_type)
 
-    if ("reconcile_flag" in vars()) or ("to_erase_number" in vars()):
-        fix_reconcile_flag_or_erase_number(transactions, reconcile_flag, to_erase_number)
+    if to_erase_number:
+        erase_number(transactions, to_erase_number)
+
+    if reconcile_flag is not None:
+        fix_reconcile_flag(transactions, reconcile_flag)
 
     if "set_txn_numbers_flag" in vars():
         for account in root.findall("./ACCOUNTS/ACCOUNT[@parentaccount='AStd::Asset']"):
             assign_txn_numbers(root, account.get("id"))
+
+    if "set_expenses_currency_flag" in vars():
+        p = re.compile('^Expenses:')
+        for account in root.findall("./ACCOUNTS/ACCOUNT"):
+            acnt_name = traverse_account_hierarchy_backwards(accounts, account.get("id"))
+            if p.match(acnt_name):
+                account.set("currency", expenses_currency)
 
     # ============== OUTPUT =====================
     xml_dmp = ET.tostring(root, encoding="utf8", xml_declaration=False)
