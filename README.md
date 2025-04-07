@@ -16,11 +16,11 @@ better understand the file format.
 Decompress gzipped *.kmy file first and then run the script:
 
     cat [inputfile].kmy | gunzip > [inputfile].xml
-    python3 kmymoney_utils.py [-enh] [-s <count>] [-r <flag>] [-o <outputfile>] <inputfile>.xml
+    python3 kmymoney_utils.py [options/flags] [-o <outputfile>] <inputfile>.xml
 
 Detailed help:
 
-    python3 kmymoney_utils.py [-enh] [-s <count>] [-r <flag>] [-o <outputfile>] <inputfile>.xml
+    python3 kmymoney_utils.py [options/flags] [-o <outputfile>] <inputfile>.xml
     
     Input arguments:
         -o --output                          Output file, if not specified, output file is set to
@@ -42,6 +42,18 @@ Detailed help:
         -r --reconcile-flag  <flag>          Assign reconcile <flag> to all splits in all transactions.
                                              <flag> can be equal to -1 (unknown), 0 (not reconciled), 1 (cleared),
                                              2 (reconciled) or 3 (frozen).
+        -a --add-tag-if-not-tagged <tag>     Add default tag if it is not present at split/transaction.
+                                             under condition that split/condition is not associated with tags in "-x"
+                                             option (default tag and excluded tags are mutually exclusive).
+        -x --excluded-tags <tag1>,<tag2>     List of exluded tags separated by a comma.
+                                             Arguments "-a household_1 -x household_2,household_3" will add default tag
+                                             "household_1" to a split/transaction if it is not taged by tags
+                                             "household_2" and "household_3".
+        -d --replace-tag-with <foo>,<bar>    Replace tag <foo> with tag <bar> in account specified by "--in-account".
+        -i --in-account <acnt>               Target account whose transactions(-splits) will have tags replaced.
+                                             Arguments '-i "ExtraHousehold" -d household_1,household_2' will replace
+                                             tag "household_1" with tag "household_2" for transactions in account
+                                             "ExtraHousehold". Account name should a substring of the full account name.
         -c --set-expenses-currency <curr>    Set all expense accounts' currency to <curr>.
         -h --help                            Print this help message.
 

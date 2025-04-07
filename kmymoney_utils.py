@@ -134,6 +134,62 @@ def find_mismatches_in_slits(transactions, accounts, payees, split_type):
     return
 
 
+def add_default_tag(transactions, accounts, tags, default_tag, excluded_tags):
+    excluded_tags_ext = excluded_tags + [default_tag]
+    for i, item in enumerate(transactions):
+        splits = item.findall("./SPLITS/SPLIT")
+        txn_id = item.attrib["id"]
+        # Check if any of destination splits is affiliated with "excluded_tags"
+        spl_ex_tags = []
+        for k in excluded_tags_ext:
+            spl_ex_tags = spl_ex_tags + item.findall(f'./SPLITS/SPLIT/TAG[@id="{tags[k]}"]')
+
+        # Check if all destination splits refer to Income or Expense accounts
+        if_dst_inc_exp = 0
+        dst_acnt_type = {}
+        for j, spl in enumerate(splits[1:], 1):
+            # Destination account
+            dst = spl.attrib
+            dst_acnt_id = dst["account"]
+            dst_acnt_type[j] = AccountTypesInv[int(accounts[dst_acnt_id]["type"])]
+            if_dst_inc_exp =+ (dst_acnt_type[j] in ["Income", "Expense"])
+
+        # If number of splits is 2 (minimal necessary) or more and the splits are not affiliated with
+        # "excluded_tags", then assign default tag
+        if (len(spl_ex_tags) == 0) and if_dst_inc_exp:
+            dt = ET.SubElement(splits[0], "TAG")
+            dt.attrib["id"] = tags[default_tag]
+        elif (len(splits) > 2):
+            for j, spl in enumerate(splits[1:], 1):
+                mspl_ex_tags = []
+                for k in excluded_tags_ext:
+                    mspl_ex_tags = mspl_ex_tags + spl.findall(f'./TAG[@id="{tags[k]}"]')
+
+                if (len(mspl_ex_tags) == 0) & (dst_acnt_type[j] in ["Income", "Expense"]):
+                    dt = ET.SubElement(spl, "TAG")
+                    dt.attrib["id"] = tags[default_tag]
+    return
+
+
+def replace_tag_in_account(transactions, tags, target_acnt_id, old_tag, new_tag):
+    for i, item in enumerate(transactions):
+        splits = item.findall("./SPLITS/SPLIT")
+
+        if len(splits) == 2:
+            # For two-split transaction, tag is stored at the first split
+            if splits[1].attrib["account"] == target_acnt_id:
+                dt = splits[0].findall(f'./TAG[@id="{tags[old_tag]}"]')
+                if len(dt) > 0:
+                    dt[0].attrib["id"] = tags[new_tag]
+        else:
+            for j, spl in enumerate(splits[1:], 1):
+                if spl.attrib["account"] == target_acnt_id:
+                    dt = spl.findall(f'./TAG[@id="{tags[old_tag]}"]')
+                    if len(dt) > 0:
+                        dt[0].attrib["id"] = tags[new_tag]
+    return
+
+
 def erase_number(transactions, to_erase_number):
     for i, item in enumerate(transactions):
         splits = item.findall("./SPLITS/SPLIT")
@@ -162,7 +218,7 @@ def assign_txn_numbers(root, account):
 
 def print_help():
     print(
-        f"python3 {sys.argv[0]} [-enh] [-s <count>] [-r <flag>] [-o <outputfile>] <inputfile>.xml\n"
+        f"python3 {sys.argv[0]} [options/flags] [-o <outputfile>] <inputfile>.xml\n"
     )
     print(
         'Input arguments:\n\
@@ -185,6 +241,18 @@ def print_help():
     -r --reconcile-flag  <flag>          Assign reconcile <flag> to all splits in all transactions.\n\
                                          <flag> can be equal to -1 (unknown), 0 (not reconciled), 1 (cleared),\n\
                                          2 (reconciled) or 3 (frozen).\n\
+    -a --add-tag-if-not-tagged <tag>     Add default tag if it is not present at split/transaction.\n\
+                                         under condition that split/condition is not associated with tags in "-x"\n\
+                                         option (default tag and excluded tags are mutually exclusive).\n\
+    -x --excluded-tags <tag1>,<tag2>     List of exluded tags separated by a comma.\n\
+                                         Arguments "-a household_1 -x household_2,household_3" will add default tag\n\
+                                         "household_1" to a split/transaction if it is not taged by tags\n\
+                                         "household_2" and "household_3".\n\
+    -d --replace-tag-with <foo>,<bar>    Replace tag <foo> with tag <bar> in account specified by "--in-account".\n\
+    -i --in-account <acnt>               Target account whose transactions(-splits) will have tags replaced.\n\
+                                         Arguments \'-i "ExtraHousehold" -d household_1,household_2\' will replace \n\
+                                         tag "household_1" with tag "household_2" for transactions in account\n\
+                                         "ExtraHousehold". Account name should a substring of the full account name.\n\
     -c --set-expenses-currency <curr>    Set all expense accounts\' currency to <curr>. \n\
     -h --help                            Print this help message.\
     '
@@ -196,15 +264,19 @@ def main(argv):
     try:
         opts, args = getopt.getopt(
             argv[1:],
-            "hec:r:o:ns:",
+            "a:d:hec:i:r:o:ns:x:",
             [
+                "add-tag-if-not-tagged=",
                 "help",
                 "fix-splits-with-count=",
                 "erase-txn-numbers",
                 "reconcile-flag=",
                 "assign-txn-numbers",
                 "output=",
-                "set-expenses-currency="
+                "set-expenses-currency=",
+                "excluded-tags",
+                "in-account=",
+                "replace-tag-with",
             ],
         )
     except getopt.GetoptError:
@@ -221,6 +293,12 @@ def main(argv):
             outputfile = arg
         elif opt in ("-e", "--erase-txn-numbers"):
             to_erase_number = True
+        elif opt in ("-a", "--add-tag-if-not-tagged"):
+            to_add_default_tag = True
+            default_tag = arg
+        elif opt in ("-x", "--excluded-tags"):
+            to_add_default_tag = True
+            excluded_tags = arg.split(",")
         elif opt in ("-s", "--fix-splits"):
             split_type = arg
         elif opt in ("-r", "--reconcile-flag"):
@@ -230,6 +308,12 @@ def main(argv):
         elif opt in ("-c", "--set-expenses-currency"):
             set_expenses_currency_flag = True
             expenses_currency = arg
+        elif opt in ("-i", "--in-account"):
+            set_replace_tag_in_account_flag = True
+            replace_target_account = arg
+        elif opt in ("-d", "--replace-tag-with"):
+            set_replace_tag_in_account_flag = True
+            old_tag, new_tag = arg.split(",")
 
     if len(args) == 1:
         inputfile = args[0]
@@ -253,6 +337,11 @@ def main(argv):
     for k in root.findall("./PAYEES/PAYEE"):
         payees[k.attrib["id"]] = k.attrib
 
+    # ================ TAGS =====================
+    tags = dict()
+    for k in root.findall("./TAGS/TAG"):
+        tags[k.attrib["name"]] = k.attrib["id"]
+
     # ============== TRANSACTIONS ===============
     transactions = root.findall("./TRANSACTIONS/TRANSACTION")
 
@@ -275,6 +364,20 @@ def main(argv):
             acnt_name = traverse_account_hierarchy_backwards(accounts, account.get("id"))
             if p.match(acnt_name):
                 account.set("currency", expenses_currency)
+
+    if "to_add_default_tag" in vars():
+        add_default_tag(transactions, accounts, tags, default_tag, excluded_tags)
+
+    if "set_replace_tag_in_account_flag" in vars():
+        # ============== REVERSE ACCOUNTS ===========
+        rev_accounts = dict()
+        for account in root.findall("./ACCOUNTS/ACCOUNT"):
+            acnt_name = traverse_account_hierarchy_backwards(accounts, account.get("id"))
+            rev_accounts[acnt_name] = account.get("id")
+
+        target_acnt_key = list(filter(lambda x: replace_target_account in x, rev_accounts.keys()))[0]
+        replace_target_acnt_id = rev_accounts[target_acnt_key]
+        replace_tag_in_account(transactions, tags, replace_target_acnt_id, old_tag, new_tag)
 
     # ============== OUTPUT =====================
     xml_dmp = ET.tostring(root, encoding="utf8", xml_declaration=False)
