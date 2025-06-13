@@ -190,6 +190,39 @@ def replace_tag_in_account(transactions, tags, target_acnt_id, old_tag, new_tag)
     return
 
 
+def move_tag_from_split_level_to_txn_level(transactions, tags, tag_to_move, accounts):
+    for i, item in enumerate(transactions):
+        splits = item.findall("./SPLITS/SPLIT")
+
+        cnt_inc_exp_acnts = 0
+        cnt_tagged_splits = 0
+        if len(splits) > 2:
+            for j, spl in enumerate(splits[1:], 1):
+                acnt = spl.attrib["account"]
+                acnt_type = AccountTypesInv[int(accounts[acnt]["type"])]
+                if acnt_type in ["Income", "Expense"]:
+                    cnt_inc_exp_acnts += 1
+                    tagged_spl = spl.findall(f'./TAG[@id="{tags[tag_to_move]}"]')
+                    if len(tagged_spl) > 0:
+                        cnt_tagged_splits += 1
+
+            if cnt_inc_exp_acnts == cnt_tagged_splits:
+                # All income/expense splits possess "tag_to_move"
+                is_top_split_tagged = bool(splits[0].findall(f'./TAG[@id="{tags[tag_to_move]}"]'))
+                if not is_top_split_tagged:
+                    dt = ET.SubElement(splits[0], "TAG")
+                    dt.attrib["id"] = tags[tag_to_move]
+
+                for j, spl in enumerate(splits[1:], 1):
+                    acnt = spl.attrib["account"]
+                    acnt_type = AccountTypesInv[int(accounts[acnt]["type"])]
+                    if acnt_type in ["Income", "Expense"]:
+                        tagged_spl = spl.findall(f'./TAG[@id="{tags[tag_to_move]}"]')[0]
+                        if tagged_spl is not None:
+                            spl.remove(tagged_spl)
+    return
+
+
 def erase_number(transactions, to_erase_number):
     for i, item in enumerate(transactions):
         splits = item.findall("./SPLITS/SPLIT")
@@ -253,6 +286,8 @@ def print_help():
                                          Arguments \'-i "ExtraHousehold" -d household_1,household_2\' will replace \n\
                                          tag "household_1" with tag "household_2" for transactions in account\n\
                                          "ExtraHousehold". Account name should a substring of the full account name.\n\
+    -m --move-split-lvl-tag-to-txn-lvl   Move tag from split level to transaction level if all splits in a the\n\
+                                         transaction have this tag assigned. Erase the tag at split level.\n\
     -c --set-expenses-currency <curr>    Set all expense accounts\' currency to <curr>. \n\
     -h --help                            Print this help message.\
     '
@@ -264,7 +299,7 @@ def main(argv):
     try:
         opts, args = getopt.getopt(
             argv[1:],
-            "a:d:hec:i:r:o:ns:x:",
+            "a:d:hec:i:r:o:m:ns:x:",
             [
                 "add-tag-if-not-tagged=",
                 "help",
@@ -277,6 +312,7 @@ def main(argv):
                 "excluded-tags",
                 "in-account=",
                 "replace-tag-with",
+                "move-split-lvl-tag-to-txn-lvl",
             ],
         )
     except getopt.GetoptError:
@@ -314,6 +350,9 @@ def main(argv):
         elif opt in ("-d", "--replace-tag-with"):
             set_replace_tag_in_account_flag = True
             old_tag, new_tag = arg.split(",")
+        elif opt in ("-m", "--move-split-lvl-tag-to-txn-lvl"):
+            set_move_split_lvl_tag_to_txn_lvl = True
+            tag_to_move = arg
 
     if len(args) == 1:
         inputfile = args[0]
@@ -378,6 +417,12 @@ def main(argv):
         target_acnt_key = list(filter(lambda x: replace_target_account in x, rev_accounts.keys()))[0]
         replace_target_acnt_id = rev_accounts[target_acnt_key]
         replace_tag_in_account(transactions, tags, replace_target_acnt_id, old_tag, new_tag)
+
+    if "set_move_split_lvl_tag_to_txn_lvl" in vars():
+        if tag_to_move in tags.keys():
+            move_tag_from_split_level_to_txn_level(transactions, tags, tag_to_move, accounts)
+        else:
+            print(f"Tag {tag_to_move} was not found in the provided XML file.")
 
     # ============== OUTPUT =====================
     xml_dmp = ET.tostring(root, encoding="utf8", xml_declaration=False)

@@ -20,8 +20,8 @@ Decompress gzipped *.kmy file first and then run the script:
 
 Detailed help:
 
-    python3 kmymoney_utils.py [options/flags] [-o <outputfile>] <inputfile>.xml
-    
+    python3 ./kmymoney_utils.py [options/flags] [-o <outputfile>] <inputfile>.xml
+
     Input arguments:
         -o --output                          Output file, if not specified, output file is set to
                                              "<input file>_fixed.xml". Input file should always be a KMyMoney XML file.
@@ -54,6 +54,8 @@ Detailed help:
                                              Arguments '-i "ExtraHousehold" -d household_1,household_2' will replace
                                              tag "household_1" with tag "household_2" for transactions in account
                                              "ExtraHousehold". Account name should a substring of the full account name.
+        -m --move-split-lvl-tag-to-txn-lvl   Move tag from split level to transaction level if all splits in a the
+                                             transaction have this tag assigned. Erase the tag at split level.
         -c --set-expenses-currency <curr>    Set all expense accounts' currency to <curr>.
         -h --help                            Print this help message.
 
