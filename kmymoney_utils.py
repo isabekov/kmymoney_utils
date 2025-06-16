@@ -436,8 +436,13 @@ def main(argv):
     # Replace a character array in 0st element of tuple with 1st element of tuple
     for k in rep_sym_dict:
         xml_dmp = xml_dmp.replace(bytes(k[0], "ascii"), bytes(k[1], "ascii"))
+
     # Convert bytes to string in UTF-8 encoding
     xml_dmp = xml_dmp.decode("utf8")
+
+    # Divide badly formatted multiple nodes on the same line
+    xml_dmp = xml_dmp.replace("><", ">\n<")
+
     with open(outputfile, "w", encoding="UTF-8") as f:
         doc_type = '<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE KMYMONEY-FILE>\n'
         file = f"{doc_type}{xml_dmp}\n"
