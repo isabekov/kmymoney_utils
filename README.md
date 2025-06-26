@@ -57,5 +57,6 @@ Detailed help:
         -m --move-split-lvl-tag-to-txn-lvl   Move tag from split level to transaction level if all splits in a the
                                              transaction have this tag assigned. Erase the tag at split level.
         -c --set-expenses-currency <curr>    Set all expense accounts' currency to <curr>.
+        -t --reorder-tags                    Reorder tags in transactions alphabetically.
         -h --help                            Print this help message.
 

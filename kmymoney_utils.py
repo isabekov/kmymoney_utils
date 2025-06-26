@@ -249,6 +249,15 @@ def assign_txn_numbers(root, account):
     return
 
 
+def reorder_tags_in_txn(transactions, rev_tags):
+    for i, item in enumerate(transactions):
+        splits = item.findall("./SPLITS/SPLIT")
+
+        for j, spl in enumerate(splits, 1):
+            spl[:] = sorted(spl.findall(f'./TAG'), key=lambda child: rev_tags[child.get("id")])
+    return
+
+
 def print_help():
     print(
         f"python3 {sys.argv[0]} [options/flags] [-o <outputfile>] <inputfile>.xml\n"
@@ -289,6 +298,7 @@ def print_help():
     -m --move-split-lvl-tag-to-txn-lvl   Move tag from split level to transaction level if all splits in a the\n\
                                          transaction have this tag assigned. Erase the tag at split level.\n\
     -c --set-expenses-currency <curr>    Set all expense accounts\' currency to <curr>. \n\
+    -t --reorder-tags                    Reorder tags in transactions alphabetically.\n\
     -h --help                            Print this help message.\
     '
     )
@@ -299,7 +309,7 @@ def main(argv):
     try:
         opts, args = getopt.getopt(
             argv[1:],
-            "a:d:hec:i:r:o:m:ns:x:",
+            "a:d:hec:i:r:o:m:ns:x:t",
             [
                 "add-tag-if-not-tagged=",
                 "help",
@@ -313,6 +323,7 @@ def main(argv):
                 "in-account=",
                 "replace-tag-with",
                 "move-split-lvl-tag-to-txn-lvl",
+                "reorder-tags"
             ],
         )
     except getopt.GetoptError:
@@ -353,6 +364,8 @@ def main(argv):
         elif opt in ("-m", "--move-split-lvl-tag-to-txn-lvl"):
             set_move_split_lvl_tag_to_txn_lvl = True
             tag_to_move = arg
+        elif opt in ("-t", "--reorder-tags"):
+            to_reorder_tags = True
 
     if len(args) == 1:
         inputfile = args[0]
@@ -423,6 +436,12 @@ def main(argv):
             move_tag_from_split_level_to_txn_level(transactions, tags, tag_to_move, accounts)
         else:
             print(f"Tag {tag_to_move} was not found in the provided XML file.")
+
+    if "to_reorder_tags" in vars():
+        rev_tags = dict()
+        for k in root.findall("./TAGS/TAG"):
+            rev_tags[k.attrib["id"]] = k.attrib["name"]
+        reorder_tags_in_txn(transactions, rev_tags)
 
     # ============== OUTPUT =====================
     xml_dmp = ET.tostring(root, encoding="utf8", xml_declaration=False)
