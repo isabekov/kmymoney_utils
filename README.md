@@ -1,12 +1,18 @@
 # Utilities for batch editing a KMyMoney's XML file
 
-This script processes transactions listed in a KMyMoney's XML file and modifies certains attributes in a batch mode.
+This script processes transactions listed in a KMyMoney's XML file and modifies certain attributes in a batch mode.
 
 Features:
 
   - fixing mismatching splits in transactions of KMyMoney's XML file,
   - erasing/setting "number" inside a split in a transaction in batch mode,
-  - overwrite reconcile flag in all splits in all transactions.
+  - overwriting reconcile flag in all splits in all transactions,
+  - adding default tag to all transactions and splits if some given tag is not set,
+  - replacing one tag with another for transactions in a given account,
+  - moving a tag from split level to transaction level if all splits in
+    transaction posses given tag; erasing the tag at split level,
+  - reordering tags alphabetically in a split/transaction,
+  - setting currency of all expense accounts to provided currency,
 
 Read the article ["Structure of a KMyMoney XML File"](https://www.isabekov.pro/structure-of-a-kmymoney-xml-file/) to
 better understand the file format.
@@ -54,8 +60,8 @@ Detailed help:
                                              Arguments '-i "ExtraHousehold" -d household_1,household_2' will replace
                                              tag "household_1" with tag "household_2" for transactions in account
                                              "ExtraHousehold". Account name should a substring of the full account name.
-        -m --move-split-lvl-tag-to-txn-lvl   Move tag from split level to transaction level if all splits in a the
-                                             transaction have this tag assigned. Erase the tag at split level.
+        -m --move-split-lvl-tag-to-txn-lvl   Move tag from split level to transaction level if all splits in a
+                                             transaction possess given tag. Erase the tag at split level.
         -c --set-expenses-currency <curr>    Set all expense accounts' currency to <curr>.
         -t --reorder-tags                    Reorder tags in transactions alphabetically.
         -h --help                            Print this help message.

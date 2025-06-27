@@ -1,9 +1,6 @@
 #! /usr/bin/python3
-# KMyMoney Utilities
-# Functionality:
-# - fix mismatching splits in transactions of KMyMoney's XML file
-# - erase/set "number" inside a split in a transaction in batch mode
-# - overwrite reconcile flag in all splits in all transactions
+# Utilities for batch editing a KMyMoney file
+# Functionality: check the help message
 # License: GPL v3.0
 # Author: Altynbek Isabekov
 
