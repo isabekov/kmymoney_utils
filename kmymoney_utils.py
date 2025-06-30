@@ -255,6 +255,27 @@ def reorder_tags_in_txn(transactions, rev_tags):
     return
 
 
+def replace_payee(transactions, payees, rev_payees, payee_pattern, payee_replacement):
+    for i, item in enumerate(transactions):
+        splits = item.findall("./SPLITS/SPLIT")
+        curr_payee = splits[0].attrib["payee"]
+        if (curr_payee != "") and re.match(payee_pattern, payees[curr_payee]["name"]):
+            if len(splits) == 2:
+                for spl in splits:
+                    spl.attrib["payee"] = rev_payees[payee_replacement]
+                    if spl.attrib["memo"] == "":
+                        spl.attrib["memo"] = payees[curr_payee]["name"]
+                    else:
+                        spl.attrib["memo"] = payees[curr_payee]["name"] + "\n" + spl.attrib["memo"]
+            else:
+                splits[0].attrib["payee"] = rev_payees[payee_replacement]
+                if splits[0].attrib["memo"] == "":
+                    splits[0].attrib["memo"] = payees[curr_payee]["name"]
+                else:
+                    splits[0].attrib["memo"] = payees[curr_payee]["name"] + "\n" + spl.attrib["memo"]
+    return
+
+
 def print_help():
     print(
         f"python3 {sys.argv[0]} [options/flags] [-o <outputfile>] <inputfile>.xml\n"
@@ -306,7 +327,7 @@ def main(argv):
     try:
         opts, args = getopt.getopt(
             argv[1:],
-            "a:d:hec:i:r:o:m:ns:x:t",
+            "a:d:hec:i:r:o:m:ns:x:tp:u:",
             [
                 "add-tag-if-not-tagged=",
                 "help",
@@ -316,11 +337,13 @@ def main(argv):
                 "assign-txn-numbers",
                 "output=",
                 "set-expenses-currency=",
-                "excluded-tags",
+                "excluded-tags=",
                 "in-account=",
                 "replace-tag-with",
                 "move-split-lvl-tag-to-txn-lvl",
-                "reorder-tags"
+                "reorder-tags",
+                "payee-pattern=",
+                "payee-replacement="
             ],
         )
     except getopt.GetoptError:
@@ -363,6 +386,11 @@ def main(argv):
             tag_to_move = arg
         elif opt in ("-t", "--reorder-tags"):
             to_reorder_tags = True
+        elif opt in ("-p", "--payee-pattern"):
+            to_replace_payee = True
+            payee_pattern = arg
+        elif opt in ("-u", "--payee-replacement"):
+            payee_for_replacement = arg
 
     if len(args) == 1:
         inputfile = args[0]
@@ -439,6 +467,30 @@ def main(argv):
         for k in root.findall("./TAGS/TAG"):
             rev_tags[k.attrib["id"]] = k.attrib["name"]
         reorder_tags_in_txn(transactions, rev_tags)
+
+    if "to_replace_payee" in vars():
+        rev_payees = dict()
+        for k in root.findall("./PAYEES/PAYEE"):
+            rev_payees[k.attrib["name"]] = k.attrib["id"]
+
+        if payee_for_replacement not in rev_payees.keys():
+            # Find the largest payee ID in the dictionary and 1 to it
+            id_payee_for_replacement = f"P{int(sorted(payees.keys())[-1][1:]) + 1}"
+            d = ET.SubElement(root.findall("./PAYEES")[0], "PAYEE")
+            d.attrib["id"] = id_payee_for_replacement
+            d.attrib["name"] = payee_for_replacement
+            d.attrib["email"] = ""
+            d.attrib["reference"] = ""
+            d.attrib["matchingenabled"] = ""
+            a = ET.SubElement(d, "ADDRESS")
+            a.attrib["telephone"] = ""
+            a.attrib["state"] = ""
+            a.attrib["city"] = ""
+            a.attrib["street"] = ""
+            a.attrib["postcode"] = ""
+            rev_payees[payee_for_replacement] = id_payee_for_replacement
+
+        replace_payee(transactions, payees, rev_payees, payee_pattern, payee_for_replacement)
 
     # ============== OUTPUT =====================
     xml_dmp = ET.tostring(root, encoding="utf8", xml_declaration=False)
